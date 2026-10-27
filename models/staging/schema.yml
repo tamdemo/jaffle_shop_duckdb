@@ -9,13 +9,29 @@ models:
           - not_null
 
   - name: stg_orders
+    description: One row per order, staged from the raw_orders seed with columns renamed to the project's naming convention (id -> order_id, user_id -> customer_id). No filtering or type changes.
     columns:
       - name: order_id
+        description: Primary key of the order (raw_orders.id).
         tests:
           - unique
           - not_null
-      - name: status
+      - name: customer_id
+        description: Foreign key to stg_customers.customer_id; the customer who placed the order (raw_orders.user_id).
         tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_customers')
+                field: customer_id
+      - name: order_date
+        description: Date (UTC) the order was placed, passed through from raw_orders.
+        tests:
+          - not_null
+      - name: status
+        description: '{{ doc("orders_status") }}'
+        tests:
+          - not_null
           - accepted_values:
               arguments:
                 values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
