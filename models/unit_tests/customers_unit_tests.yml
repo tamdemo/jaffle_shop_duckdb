@@ -1,0 +1,100 @@
+unit_tests:
+  - name: customers_aggregates_multiple_orders_and_payments
+    description: >
+      A customer with several orders, each with one or more payments, gets
+      min/max order_date, the order count, and the sum of all payment amounts.
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: 1, first_name: Michael, last_name: P.}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 10, customer_id: 1, order_date: '2018-01-05', status: completed}
+          - {order_id: 11, customer_id: 1, order_date: '2018-01-01', status: completed}
+          - {order_id: 12, customer_id: 1, order_date: '2018-03-20', status: placed}
+      - input: ref('stg_payments')
+        rows:
+          - {payment_id: 100, order_id: 10, payment_method: credit_card, amount: 10.0}
+          - {payment_id: 101, order_id: 10, payment_method: coupon, amount: 5.5}
+          - {payment_id: 102, order_id: 11, payment_method: bank_transfer, amount: 20.0}
+          - {payment_id: 103, order_id: 12, payment_method: gift_card, amount: 4.5}
+    expect:
+      rows:
+        - customer_id: 1
+          first_name: Michael
+          last_name: P.
+          first_order: '2018-01-01'
+          most_recent_order: '2018-03-20'
+          number_of_orders: 3
+          customer_lifetime_value: 40.0
+
+  - name: customers_without_orders_keep_a_row_with_null_facts
+    description: >
+      The left joins from stg_customers keep customers with no orders; their
+      order facts and lifetime value are NULL (not 0). Documents current behaviour.
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: 1, first_name: Michael, last_name: P.}
+          - {customer_id: 2, first_name: Shawn, last_name: M.}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 10, customer_id: 1, order_date: '2018-01-01', status: completed}
+      - input: ref('stg_payments')
+        rows:
+          - {payment_id: 100, order_id: 10, payment_method: credit_card, amount: 12.0}
+    expect:
+      rows:
+        - {customer_id: 1, first_name: Michael, last_name: P., first_order: '2018-01-01', most_recent_order: '2018-01-01', number_of_orders: 1, customer_lifetime_value: 12.0}
+        - {customer_id: 2, first_name: Shawn, last_name: M., first_order: null, most_recent_order: null, number_of_orders: null, customer_lifetime_value: null}
+
+  - name: customers_payments_attributed_via_orders_to_correct_customer
+    description: >
+      Payments are attributed to customers through stg_orders; payments split
+      across several orders of one customer are summed, and do not leak into
+      another customer's lifetime value.
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: 1, first_name: Michael, last_name: P.}
+          - {customer_id: 2, first_name: Shawn, last_name: M.}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 10, customer_id: 1, order_date: '2018-01-01', status: completed}
+          - {order_id: 11, customer_id: 1, order_date: '2018-01-02', status: completed}
+          - {order_id: 20, customer_id: 2, order_date: '2018-01-03', status: shipped}
+      - input: ref('stg_payments')
+        rows:
+          - {payment_id: 100, order_id: 10, payment_method: credit_card, amount: 1.25}
+          - {payment_id: 101, order_id: 11, payment_method: credit_card, amount: 2.25}
+          - {payment_id: 102, order_id: 11, payment_method: gift_card, amount: 3.5}
+          - {payment_id: 200, order_id: 20, payment_method: coupon, amount: 100.0}
+    expect:
+      rows:
+        - {customer_id: 1, number_of_orders: 2, customer_lifetime_value: 7.0}
+        - {customer_id: 2, number_of_orders: 1, customer_lifetime_value: 100.0}
+
+  - name: customers_orders_without_payments_and_zero_amounts
+    description: >
+      Edge cases: an order with no payments is still counted but leaves the
+      lifetime value NULL; a zero-amount payment yields a lifetime value of 0.
+    model: customers
+    given:
+      - input: ref('stg_customers')
+        rows:
+          - {customer_id: 1, first_name: Michael, last_name: P.}
+          - {customer_id: 2, first_name: Shawn, last_name: M.}
+      - input: ref('stg_orders')
+        rows:
+          - {order_id: 10, customer_id: 1, order_date: '2018-01-01', status: placed}
+          - {order_id: 20, customer_id: 2, order_date: '2018-01-02', status: completed}
+      - input: ref('stg_payments')
+        rows:
+          - {payment_id: 200, order_id: 20, payment_method: coupon, amount: 0.0}
+    expect:
+      rows:
+        - {customer_id: 1, number_of_orders: 1, customer_lifetime_value: null}
+        - {customer_id: 2, number_of_orders: 1, customer_lifetime_value: 0.0}

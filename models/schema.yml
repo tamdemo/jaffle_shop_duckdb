@@ -13,21 +13,37 @@ models:
 
       - name: first_name
         description: Customer's first name. PII.
+        tests:
+          - not_null
 
       - name: last_name
         description: Customer's last name. PII.
+        tests:
+          - not_null
 
       - name: first_order
-        description: Date (UTC) of a customer's first order
+        description: Date (UTC) of a customer's first order. NULL if the customer has no orders.
 
       - name: most_recent_order
-        description: Date (UTC) of a customer's most recent order
+        description: Date (UTC) of a customer's most recent order. NULL if the customer has no orders.
 
       - name: number_of_orders
-        description: Count of the number of orders a customer has placed
+        description: Count of the number of orders a customer has placed. NULL (not 0) if the customer has no orders.
+        tests:
+          # Data issue: customers without orders get NULL instead of 0 (38 of 100 rows
+          # on current data). Kept at warn to surface it without blocking; see PR.
+          - not_null:
+              config:
+                severity: warn
 
-      - name: total_order_amount
-        description: Total value (AUD) of a customer's orders
+      - name: customer_lifetime_value
+        description: Total value (AUD) of all payments across a customer's orders. NULL (not 0) if the customer has no orders or no payments.
+        tests:
+          # Data issue: same as number_of_orders - NULL instead of 0 for customers
+          # without orders (38 of 100 rows on current data). Kept at warn; see PR.
+          - not_null:
+              config:
+                severity: warn
 
   - name: orders
     description: This table has basic information about orders, as well as some derived facts based on payments
