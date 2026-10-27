@@ -1,0 +1,32 @@
+version: 2
+
+unit_tests:
+  - name: stg_orders_renames_and_passes_through_columns
+    description: id is renamed to order_id and user_id to customer_id; order_date and status pass through unchanged, one output row per input row.
+    model: stg_orders
+    given:
+      - input: ref('raw_orders')
+        rows:
+          - {id: 1, user_id: 10, order_date: '2018-01-01', status: placed}
+          - {id: 2, user_id: 10, order_date: '2018-01-02', status: completed}
+          - {id: 3, user_id: 20, order_date: '2018-02-28', status: returned}
+    expect:
+      rows:
+        - {order_id: 1, customer_id: 10, order_date: '2018-01-01', status: placed}
+        - {order_id: 2, customer_id: 10, order_date: '2018-01-02', status: completed}
+        - {order_id: 3, customer_id: 20, order_date: '2018-02-28', status: returned}
+
+  - name: stg_orders_does_not_filter_or_coerce_nulls_and_unknown_status
+    description: The model applies no filtering, defaulting or validation; null customer/date/status and unrecognised statuses are passed through as-is (they are caught by the data tests on stg_orders instead).
+    model: stg_orders
+    given:
+      - input: ref('raw_orders')
+        rows:
+          - {id: 1, user_id: null, order_date: '2018-01-01', status: shipped}
+          - {id: 2, user_id: 5, order_date: null, status: null}
+          - {id: 3, user_id: 6, order_date: '2018-03-01', status: cancelled}
+    expect:
+      rows:
+        - {order_id: 1, customer_id: null, order_date: '2018-01-01', status: shipped}
+        - {order_id: 2, customer_id: 5, order_date: null, status: null}
+        - {order_id: 3, customer_id: 6, order_date: '2018-03-01', status: cancelled}
