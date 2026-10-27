@@ -1,0 +1,41 @@
+unit_tests:
+  - name: stg_payments_converts_cents_to_dollars
+    description: Raw amount is in integer cents; stg_payments divides by 100, including non-round, 1-cent and zero values.
+    model: stg_payments
+    given:
+      - input: ref('raw_payments')
+        rows:
+          - {id: 1, order_id: 1, payment_method: credit_card, amount: 1000}
+          - {id: 2, order_id: 1, payment_method: coupon, amount: 1050}
+          - {id: 3, order_id: 2, payment_method: gift_card, amount: 1}
+          - {id: 4, order_id: 3, payment_method: bank_transfer, amount: 0}
+    expect:
+      rows:
+        - {payment_id: 1, amount: 10.0}
+        - {payment_id: 2, amount: 10.5}
+        - {payment_id: 3, amount: 0.01}
+        - {payment_id: 4, amount: 0.0}
+
+  - name: stg_payments_renames_id_and_passes_through_columns
+    description: "`id` is renamed to `payment_id`; order_id and payment_method are passed through unchanged."
+    model: stg_payments
+    given:
+      - input: ref('raw_payments')
+        rows:
+          - {id: 7, order_id: 42, payment_method: credit_card, amount: 2500}
+          - {id: 8, order_id: 42, payment_method: gift_card, amount: 500}
+    expect:
+      rows:
+        - {payment_id: 7, order_id: 42, payment_method: credit_card, amount: 25.0}
+        - {payment_id: 8, order_id: 42, payment_method: gift_card, amount: 5.0}
+
+  - name: stg_payments_null_amount_stays_null
+    description: A NULL raw amount stays NULL after conversion (it is not coerced to 0); the not_null data test catches it.
+    model: stg_payments
+    given:
+      - input: ref('raw_payments')
+        rows:
+          - {id: 9, order_id: 5, payment_method: coupon, amount: null}
+    expect:
+      rows:
+        - {payment_id: 9, amount: null}

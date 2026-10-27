@@ -21,13 +21,30 @@ models:
                 values: ['placed', 'shipped', 'completed', 'return_pending', 'returned']
 
   - name: stg_payments
+    description: One row per payment, lightly cleaned from the raw_payments seed. Renames `id` to `payment_id` and converts `amount` from cents to dollars.
     columns:
       - name: payment_id
+        description: Unique identifier for a payment (renamed from `id` in raw_payments).
         tests:
           - unique
           - not_null
+      - name: order_id
+        description: Foreign key to stg_orders.order_id. An order can have several payments.
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_orders')
+                field: order_id
       - name: payment_method
+        description: Method used to pay for the order (credit_card, coupon, bank_transfer or gift_card).
         tests:
           - accepted_values:
               arguments:
                 values: ['credit_card', 'coupon', 'bank_transfer', 'gift_card']
+      - name: amount
+        description: >
+          Payment amount in dollars, computed as raw `amount` (integer cents) / 100.
+          Note: in DuckDB this division returns DOUBLE, so the value is a float, not a fixed-precision decimal.
+        tests:
+          - not_null
