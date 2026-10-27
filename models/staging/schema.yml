@@ -2,10 +2,22 @@ version: 2
 
 models:
   - name: stg_customers
+    description: >
+      Staging model for customers. One row per customer from the raw_customers seed,
+      with `id` renamed to `customer_id`; names are passed through unchanged.
     columns:
       - name: customer_id
+        description: Unique identifier for a customer (renamed from raw_customers.id).
         tests:
           - unique
+          - not_null
+      - name: first_name
+        description: Customer's first name, passed through from raw_customers. PII.
+        tests:
+          - not_null
+      - name: last_name
+        description: Customer's last name as provided by the source, which is an initial only (e.g. 'P.'). PII.
+        tests:
           - not_null
 
   - name: stg_orders
